@@ -180,6 +180,75 @@ export class ImapProvider implements MailProvider {
     }
   }
 
+  async markFlagged(accountId: string, messageId: string, isFlagged: boolean): Promise<void> {
+    this.assertOwns(accountId);
+    const parsed = parseMessageId(messageId);
+    if (!parsed || parsed.accountId !== accountId) {
+      throw new AegisError('invalid_input', `Message not on this account: ${messageId}`);
+    }
+    const client = await this.connection.acquire();
+    const lock = await client.getMailboxLock(parsed.path);
+    try {
+      const range = String(parsed.uid);
+      if (isFlagged) {
+        await client.messageFlagsAdd(range, ['\\Flagged'], { uid: true });
+      } else {
+        await client.messageFlagsRemove(range, ['\\Flagged'], { uid: true });
+      }
+    } catch (err) {
+      throw mapImapError(err, 'mark flagged failed');
+    } finally {
+      lock.release();
+    }
+  }
+
+  async moveMessage(
+    accountId: string,
+    messageId: string,
+    targetMailboxId: string,
+  ): Promise<string> {
+    this.assertOwns(accountId);
+    const srcParsed = parseMessageId(messageId);
+    if (!srcParsed || srcParsed.accountId !== accountId) {
+      throw new AegisError('invalid_input', `Message not on this account: ${messageId}`);
+    }
+    const dstParsed = parseMailboxId(targetMailboxId);
+    if (!dstParsed || dstParsed.accountId !== accountId) {
+      throw new AegisError(
+        'invalid_input',
+        `Target mailbox not on this account: ${targetMailboxId}`,
+      );
+    }
+    if (srcParsed.path === dstParsed.path) {
+      return messageId;
+    }
+
+    const client = await this.connection.acquire();
+    const lock = await client.getMailboxLock(srcParsed.path);
+    try {
+      const result = await client.messageMove(String(srcParsed.uid), dstParsed.path, {
+        uid: true,
+      });
+      if (!result) {
+        throw new AegisError('provider_error', 'IMAP MOVE returned no response');
+      }
+      // imapflow returns { path, destination, uidMap } on success, where
+      // uidMap is a Map<srcUid, dstUid>. Pick our dest UID from it.
+      const newUid = result.uidMap?.get(srcParsed.uid);
+      if (typeof newUid !== 'number') {
+        // Fallback: can't know new UID; return a best-effort ID pointing
+        // at the destination mailbox without a uid. Callers should
+        // refresh the destination list.
+        return makeMessageId(accountId, dstParsed.path, srcParsed.uid);
+      }
+      return makeMessageId(accountId, dstParsed.path, newUid);
+    } catch (err) {
+      throw mapImapError(err, 'move message failed');
+    } finally {
+      lock.release();
+    }
+  }
+
   private assertOwns(accountId: string): void {
     if (accountId !== this.accountId) {
       throw new AegisError(

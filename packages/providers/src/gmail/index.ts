@@ -19,4 +19,10 @@ export class GmailProvider implements MailProvider {
   async markRead(): Promise<never> {
     throw new AegisError('provider_error', 'GmailProvider.markRead not yet implemented');
   }
+  async markFlagged(): Promise<never> {
+    throw new AegisError('provider_error', 'GmailProvider.markFlagged not yet implemented');
+  }
+  async moveMessage(): Promise<never> {
+    throw new AegisError('provider_error', 'GmailProvider.moveMessage not yet implemented');
+  }
 }

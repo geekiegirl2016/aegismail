@@ -19,4 +19,10 @@ export class GraphProvider implements MailProvider {
   async markRead(): Promise<never> {
     throw new AegisError('provider_error', 'GraphProvider.markRead not yet implemented');
   }
+  async markFlagged(): Promise<never> {
+    throw new AegisError('provider_error', 'GraphProvider.markFlagged not yet implemented');
+  }
+  async moveMessage(): Promise<never> {
+    throw new AegisError('provider_error', 'GraphProvider.moveMessage not yet implemented');
+  }
 }

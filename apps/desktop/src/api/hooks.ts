@@ -89,6 +89,81 @@ export function useMessage(
   });
 }
 
+export function usePrefetchMessage(accountId: string | null) {
+  const qc = useQueryClient();
+  return (messageId: string) => {
+    if (!accountId) return;
+    void qc.prefetchQuery({
+      queryKey: qk.message(accountId, messageId),
+      queryFn: async () => (await api.getMessage(accountId, messageId)).message,
+      staleTime: 60_000,
+    });
+  };
+}
+
+/**
+ * Apply a partial update to a message inside every cached `messages`
+ * list and in its detail cache. Used by optimistic flag/read toggles.
+ */
+function patchMessageInCaches(
+  qc: ReturnType<typeof useQueryClient>,
+  accountId: string,
+  messageId: string,
+  patch: Partial<Message>,
+): () => void {
+  const snapshots: Array<[readonly unknown[], Message[] | undefined]> = [];
+
+  const messageKeyPrefix = ['messages', accountId] as const;
+  const listQueries = qc.getQueriesData<Message[]>({ queryKey: messageKeyPrefix });
+  for (const [key, value] of listQueries) {
+    snapshots.push([key, value]);
+    if (!value) continue;
+    qc.setQueryData<Message[]>(
+      key,
+      value.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
+    );
+  }
+
+  const detailKey = qk.message(accountId, messageId);
+  const detailPrev = qc.getQueryData<Message>(detailKey);
+  if (detailPrev) {
+    snapshots.push([detailKey, [detailPrev]]);
+    qc.setQueryData<Message>(detailKey, { ...detailPrev, ...patch });
+  }
+
+  return () => {
+    for (const [key, value] of snapshots) {
+      if (key[0] === 'message') {
+        qc.setQueryData(key, value?.[0]);
+      } else {
+        qc.setQueryData(key, value);
+      }
+    }
+  };
+}
+
+function removeMessageFromListCaches(
+  qc: ReturnType<typeof useQueryClient>,
+  accountId: string,
+  messageId: string,
+): () => void {
+  const snapshots: Array<[readonly unknown[], Message[] | undefined]> = [];
+  const listQueries = qc.getQueriesData<Message[]>({
+    queryKey: ['messages', accountId],
+  });
+  for (const [key, value] of listQueries) {
+    if (!value) continue;
+    snapshots.push([key, value]);
+    qc.setQueryData<Message[]>(
+      key,
+      value.filter((m) => m.id !== messageId),
+    );
+  }
+  return () => {
+    for (const [key, value] of snapshots) qc.setQueryData(key, value);
+  };
+}
+
 export function useMarkRead(accountId: string | null) {
   const qc = useQueryClient();
   return useMutation({
@@ -96,10 +171,71 @@ export function useMarkRead(accountId: string | null) {
       if (!accountId) throw new Error('no account');
       await api.markRead(accountId, input.messageId, input.isRead);
     },
-    onSuccess: () => {
+    onMutate: async ({ messageId, isRead }) => {
+      if (!accountId) return;
+      const rollback = patchMessageInCaches(qc, accountId, messageId, { isRead });
+      return { rollback };
+    },
+    onError: (_err, _vars, ctx) => ctx?.rollback?.(),
+  });
+}
+
+export function useMarkFlagged(accountId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { messageId: string; isFlagged: boolean }) => {
+      if (!accountId) throw new Error('no account');
+      await api.markFlagged(accountId, input.messageId, input.isFlagged);
+    },
+    onMutate: async ({ messageId, isFlagged }) => {
+      if (!accountId) return;
+      const rollback = patchMessageInCaches(qc, accountId, messageId, { isFlagged });
+      return { rollback };
+    },
+    onError: (_err, _vars, ctx) => ctx?.rollback?.(),
+  });
+}
+
+export function useDeleteMessage(accountId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { messageId: string }) => {
+      if (!accountId) throw new Error('no account');
+      return api.deleteMessage(accountId, input.messageId);
+    },
+    onMutate: async ({ messageId }) => {
+      if (!accountId) return;
+      await qc.cancelQueries({ queryKey: ['messages', accountId] });
+      const rollback = removeMessageFromListCaches(qc, accountId, messageId);
+      return { rollback };
+    },
+    onError: (_err, _vars, ctx) => ctx?.rollback?.(),
+    onSettled: () => {
       if (!accountId) return;
       void qc.invalidateQueries({ queryKey: ['messages', accountId] });
-      void qc.invalidateQueries({ queryKey: ['message', accountId] });
+      void qc.invalidateQueries({ queryKey: qk.mailboxes(accountId) });
+    },
+  });
+}
+
+export function useMoveMessage(accountId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { messageId: string; targetMailboxId: string }) => {
+      if (!accountId) throw new Error('no account');
+      return api.moveMessage(accountId, input.messageId, input.targetMailboxId);
+    },
+    onMutate: async ({ messageId }) => {
+      if (!accountId) return;
+      await qc.cancelQueries({ queryKey: ['messages', accountId] });
+      const rollback = removeMessageFromListCaches(qc, accountId, messageId);
+      return { rollback };
+    },
+    onError: (_err, _vars, ctx) => ctx?.rollback?.(),
+    onSettled: () => {
+      if (!accountId) return;
+      void qc.invalidateQueries({ queryKey: ['messages', accountId] });
+      void qc.invalidateQueries({ queryKey: qk.mailboxes(accountId) });
     },
   });
 }

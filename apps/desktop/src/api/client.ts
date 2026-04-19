@@ -120,4 +120,22 @@ export const api = {
       `/v1/accounts/${encodeURIComponent(accountId)}/messages/${encodeURIComponent(messageId)}`,
       { method: 'PATCH', body: { isRead } },
     ),
+
+  markFlagged: (accountId: string, messageId: string, isFlagged: boolean) =>
+    request<void>(
+      `/v1/accounts/${encodeURIComponent(accountId)}/messages/${encodeURIComponent(messageId)}`,
+      { method: 'PATCH', body: { isFlagged } },
+    ),
+
+  moveMessage: (accountId: string, messageId: string, targetMailboxId: string) =>
+    request<{ messageId: string }>(
+      `/v1/accounts/${encodeURIComponent(accountId)}/messages/${encodeURIComponent(messageId)}/move`,
+      { method: 'POST', body: { mailboxId: targetMailboxId } },
+    ),
+
+  deleteMessage: (accountId: string, messageId: string) =>
+    request<{ messageId: string }>(
+      `/v1/accounts/${encodeURIComponent(accountId)}/messages/${encodeURIComponent(messageId)}`,
+      { method: 'DELETE' },
+    ),
 };

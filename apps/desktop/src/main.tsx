@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
+import { ThemeProvider } from './contexts/ThemeContext.tsx';
 import './styles.css';
 
 const queryClient = new QueryClient({
@@ -23,7 +24,9 @@ if (!rootEl) throw new Error('Root element #root not found');
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );
