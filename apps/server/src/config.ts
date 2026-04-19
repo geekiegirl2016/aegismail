@@ -8,6 +8,8 @@ const schema = z.object({
     .default('info'),
   AEGIS_GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   AEGIS_GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  AEGIS_MS_OAUTH_CLIENT_ID: z.string().optional(),
+  AEGIS_MS_OAUTH_CLIENT_SECRET: z.string().optional(),
 });
 
 export type Config = z.infer<typeof schema>;
@@ -30,4 +32,17 @@ export function googleOAuthFromConfig(
     clientId: config.AEGIS_GOOGLE_OAUTH_CLIENT_ID,
     clientSecret: config.AEGIS_GOOGLE_OAUTH_CLIENT_SECRET,
   };
+}
+
+export function microsoftOAuthFromConfig(
+  config: Config,
+): { clientId: string; clientSecret?: string } | null {
+  if (!config.AEGIS_MS_OAUTH_CLIENT_ID) return null;
+  const result: { clientId: string; clientSecret?: string } = {
+    clientId: config.AEGIS_MS_OAUTH_CLIENT_ID,
+  };
+  if (config.AEGIS_MS_OAUTH_CLIENT_SECRET) {
+    result.clientSecret = config.AEGIS_MS_OAUTH_CLIENT_SECRET;
+  }
+  return result;
 }

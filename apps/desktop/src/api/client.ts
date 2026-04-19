@@ -155,4 +155,16 @@ export const api = {
       method: 'POST',
       body: { sessionId },
     }),
+
+  startMicrosoftOAuth: (input: { displayName: string; loginHint?: string }) =>
+    request<{ sessionId: string; authUrl: string }>('/v1/oauth/microsoft/start', {
+      method: 'POST',
+      body: input,
+    }),
+
+  awaitMicrosoftOAuth: (sessionId: string) =>
+    request<{ account: Account }>('/v1/oauth/microsoft/await', {
+      method: 'POST',
+      body: { sessionId },
+    }),
 };

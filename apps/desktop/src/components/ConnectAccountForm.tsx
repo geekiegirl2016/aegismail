@@ -35,7 +35,7 @@ const PROVIDERS: readonly ProviderOption[] = [
     id: 'outlook',
     label: 'Outlook',
     kind: 'oauth',
-    note: 'Microsoft Graph — coming in Phase 11.',
+    note: 'Sign in with Microsoft (personal, work, or school).',
   },
 ];
 
@@ -86,17 +86,24 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
     }
   }
 
-  async function handleGmailSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleOAuthSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setOauthBusy(true);
     try {
-      const { sessionId, authUrl } = await api.startGoogleOAuth({
+      const input = {
         displayName: displayName.trim(),
         ...(emailAddress.trim() ? { loginHint: emailAddress.trim() } : {}),
-      });
+      };
+      const { sessionId, authUrl } =
+        provider === 'outlook'
+          ? await api.startMicrosoftOAuth(input)
+          : await api.startGoogleOAuth(input);
       await openExternal(authUrl);
-      const { account } = await api.awaitGoogleOAuth(sessionId);
+      const { account } =
+        provider === 'outlook'
+          ? await api.awaitMicrosoftOAuth(sessionId)
+          : await api.awaitGoogleOAuth(sessionId);
       await qc.invalidateQueries({ queryKey: qk.accounts });
       setDisplayName('');
       setEmailAddress('');
@@ -118,7 +125,7 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
   }
 
   const handleSubmit =
-    selected.kind === 'oauth' ? handleGmailSubmit : handleIcloudSubmit;
+    selected.kind === 'oauth' ? handleOAuthSubmit : handleIcloudSubmit;
 
   const busy = creating || oauthBusy;
 
@@ -193,13 +200,23 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
           </>
         ) : selected.id === 'gmail' ? (
           googleConfigured ? (
-            'We\'ll open Google in your browser for you to sign in. Tokens land in the macOS Keychain.'
+            "We'll open Google in your browser for you to sign in. Tokens land in the macOS Keychain."
           ) : (
             <>
               Google OAuth isn't configured for this install. See{' '}
               <code>docs/oauth-setup.md</code> and set the{' '}
               <code>AEGIS_GOOGLE_OAUTH_CLIENT_ID</code> /{' '}
               <code>AEGIS_GOOGLE_OAUTH_CLIENT_SECRET</code> env vars.
+            </>
+          )
+        ) : selected.id === 'outlook' ? (
+          microsoftConfigured ? (
+            "We'll open Microsoft in your browser. Personal, work, and school accounts (including university Microsoft 365) all work."
+          ) : (
+            <>
+              Microsoft OAuth isn't configured for this install. See{' '}
+              <code>docs/oauth-setup.md</code> and set the{' '}
+              <code>AEGIS_MS_OAUTH_CLIENT_ID</code> env var.
             </>
           )
         ) : (

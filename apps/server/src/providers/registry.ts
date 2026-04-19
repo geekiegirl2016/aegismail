@@ -3,20 +3,22 @@ import {
   ImapProvider,
   ImapAccountConfig,
   GMAIL_IMAP,
+  OUTLOOK_IMAP,
 } from '@aegismail/providers/imap';
 import type { MailProvider } from '@aegismail/providers';
 import type { AccountsRepo } from '../db/accounts.ts';
 import type { CredentialStore } from '../keychain.ts';
 import type { TokenStore } from '../oauth/token-store.ts';
-import { refreshAccessToken } from '../oauth/google.ts';
-import { googleOAuthFromConfig, type Config } from '../config.ts';
+import { refreshAccessToken as refreshGoogleToken } from '../oauth/google.ts';
+import { refreshAccessToken as refreshMicrosoftToken } from '../oauth/microsoft.ts';
+import {
+  googleOAuthFromConfig,
+  microsoftOAuthFromConfig,
+  type Config,
+} from '../config.ts';
 
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 
-/**
- * Holds live per-account `MailProvider` instances. Built on first use
- * and cached for the process lifetime.
- */
 export class ProviderRegistry {
   private readonly cache = new Map<string, MailProvider>();
 
@@ -62,10 +64,7 @@ export class ProviderRegistry {
       case 'gmail':
         return this.buildGmail(accountId);
       case 'outlook':
-        throw new AegisError(
-          'provider_error',
-          'Outlook provider is not yet implemented (Phase 11).',
-        );
+        return this.buildOutlook(accountId);
     }
   }
 
@@ -119,7 +118,7 @@ export class ProviderRegistry {
           'Access token expired and no refresh token stored. Reconnect.',
         );
       }
-      const refreshed = await refreshAccessToken(google, stored.refreshToken);
+      const refreshed = await refreshGoogleToken(google, stored.refreshToken);
       await this.tokens.set(accountId, refreshed);
       return refreshed.accessToken;
     };
@@ -127,6 +126,48 @@ export class ProviderRegistry {
     return new ImapProvider({
       accountId,
       providerId: 'gmail',
+      config,
+      credentials: { username: config.username, getAccessToken },
+    });
+  }
+
+  private async buildOutlook(accountId: string): Promise<MailProvider> {
+    const ms = microsoftOAuthFromConfig(this.config);
+    if (!ms) {
+      throw new AegisError(
+        'provider_error',
+        'Microsoft OAuth client is not configured. Set AEGIS_MS_OAUTH_CLIENT_ID.',
+      );
+    }
+
+    const rawConfig = this.accounts.getConfig(accountId);
+    if (!rawConfig) throw new AegisError('not_found', `Account ${accountId} config missing`);
+    const config = ImapAccountConfig.parse({ ...OUTLOOK_IMAP, ...rawConfig });
+
+    const getAccessToken = async (): Promise<string> => {
+      const stored = await this.tokens.get(accountId);
+      if (!stored) {
+        throw new AegisError(
+          'unauthorized',
+          `No OAuth tokens stored for account ${accountId}. Reconnect.`,
+        );
+      }
+      const now = Date.now();
+      if (stored.expiresAt - now > TOKEN_REFRESH_SKEW_MS) return stored.accessToken;
+      if (!stored.refreshToken) {
+        throw new AegisError(
+          'unauthorized',
+          'Access token expired and no refresh token stored. Reconnect.',
+        );
+      }
+      const refreshed = await refreshMicrosoftToken(ms, stored.refreshToken);
+      await this.tokens.set(accountId, refreshed);
+      return refreshed.accessToken;
+    };
+
+    return new ImapProvider({
+      accountId,
+      providerId: 'outlook',
       config,
       credentials: { username: config.username, getAccessToken },
     });

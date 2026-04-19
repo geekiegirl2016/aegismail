@@ -67,22 +67,36 @@ Client IDs **are not secret** for public (desktop) OAuth apps — they're identi
 
 4. **Authentication** → make sure *Allow public client flows* is toggled **Yes**. Save.
 
-5. **API permissions** → *Add a permission*:
-   - Microsoft Graph → *Delegated permissions*.
-   - Check:
-     - `Mail.ReadWrite`
-     - `Mail.Send`
-     - `MailboxSettings.Read`
-     - `User.Read`
-     - `offline_access` (required for refresh tokens)
-   - *Add permissions*. If your org requires it, click *Grant admin consent* (not needed for personal accounts).
+5. **API permissions** → *Add a permission* → *APIs my organization uses* → search for **Office 365 Exchange Online** → *Delegated permissions*:
+   - `IMAP.AccessAsUser.All`
+   - `SMTP.Send`
 
-6. **Drop the client ID into the repo**:
-   - Add to `.env`:
-     ```
-     AEGIS_MS_OAUTH_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-     ```
-   - Or commit to `apps/server/src/oauth/microsoft.ts` for distribution.
+   Then *Add a permission* → *Microsoft Graph* → *Delegated permissions*:
+   - `offline_access` (refresh tokens)
+   - `openid`, `email`, `profile` (user info via id_token)
+
+   The Outlook `IMAP.AccessAsUser.All` and `SMTP.Send` scopes are what AegisMail uses — it talks to `outlook.office365.com:993` via IMAP XOAUTH2, same shape as Gmail. Skip the Graph `Mail.ReadWrite` family for now; Phase 12 might swap to Graph REST but IMAP works everywhere.
+
+   If *Grant admin consent for tenant* is available and you're in your own tenant, click it. For work / school accounts you'll consent per-user at sign-in.
+
+6. **Drop the client ID into `.env`**:
+   ```
+   AEGIS_MS_OAUTH_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   ```
+
+   Desktop public clients don't get a client secret and don't need one — PKCE handles it. If you accidentally registered as "Web" and got a secret, also set `AEGIS_MS_OAUTH_CLIENT_SECRET` (and re-register as Public client next time).
+
+### Using with a university / corporate account
+
+The app you registered is **yours** — it's not tied to Capitol Tech (or your employer). Because you chose multi-tenant, when you sign in with `you@captechu.edu`, Microsoft routes the flow through Capitol Tech's tenant and shows you their branded consent screen.
+
+Three possible outcomes on first sign-in:
+
+1. **Clean consent** — click approve, it works.
+2. **"Admin approval required"** — your tenant requires IT to pre-approve third-party apps. Email IT your app's `Application (client) ID` and the scopes above and ask them to grant admin consent.
+3. **Blocked by Conditional Access** — rare; usually means the device isn't enrolled. Sign in from a managed device or ask IT for an exemption.
+
+If you hit #2 or #3 and can't get around it, you can still test the IMAP integration with any free `outlook.com` / `hotmail.com` account.
 
 ---
 

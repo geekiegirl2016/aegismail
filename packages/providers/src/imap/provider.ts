@@ -26,14 +26,14 @@ export interface ImapOAuthCredentials {
 export interface ImapProviderOptions {
   accountId: string;
   /** Which AccountProvider label this instance reports as. Defaults to 'icloud'. */
-  providerId?: 'icloud' | 'gmail';
+  providerId?: 'icloud' | 'gmail' | 'outlook';
   config: ImapAccountConfig;
   /** Static password or an OAuth2 access-token supplier. */
   credentials: ImapCredentials | ImapOAuthCredentials;
 }
 
 export class ImapProvider implements MailProvider {
-  readonly id: 'icloud' | 'gmail';
+  readonly id: 'icloud' | 'gmail' | 'outlook';
   readonly accountId: string;
   private readonly connection: ImapConnection;
 

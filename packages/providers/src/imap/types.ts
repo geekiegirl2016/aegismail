@@ -49,3 +49,15 @@ export const GMAIL_SMTP = {
   port: 465,
   secure: true,
 } as const;
+
+export const OUTLOOK_IMAP: Pick<ImapAccountConfig, 'host' | 'port' | 'secure'> = {
+  host: 'outlook.office365.com',
+  port: 993,
+  secure: true,
+};
+
+export const OUTLOOK_SMTP = {
+  host: 'smtp.office365.com',
+  port: 587,
+  secure: false, // STARTTLS
+} as const;
