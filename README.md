@@ -35,21 +35,41 @@ Managed as a pnpm workspace with Turborepo.
 ### Prerequisites
 
 - Node.js **≥ 20.11** and pnpm **≥ 9**
-- Rust stable toolchain (for Tauri) — install via [rustup](https://rustup.rs)
+- Rust stable toolchain (for Tauri) — `brew install rust` or [rustup](https://rustup.rs)
 - Platform build deps for Tauri 2 — see the [Tauri prerequisites guide](https://tauri.app/start/prerequisites/)
 
-### Install & run
+### Develop
 
 ```sh
 pnpm install
-cp .env.example .env           # fill in OAuth credentials as needed
 
-# run the backend + MCP server
+# Backend (must be running for the desktop app to work)
 pnpm --filter @aegismail/server dev
 
-# run the desktop shell (in a second terminal)
+# Desktop app in dev mode (hot-reload)
 pnpm --filter @aegismail/desktop tauri:dev
 ```
+
+### Build a native macOS app
+
+```sh
+pnpm --filter @aegismail/desktop tauri:build
+```
+
+Artifacts land in `apps/desktop/src-tauri/target/release/bundle/`:
+- `macos/AegisMail.app` — drag into `/Applications`
+- `dmg/AegisMail_*_aarch64.dmg` — share-friendly installer
+
+Because the build is **unsigned**, macOS Gatekeeper will refuse to open the `.app` on first launch. Workarounds:
+
+- Right-click the `.app` → **Open** → confirm in the dialog, or
+- Strip the quarantine attribute: `xattr -d com.apple.quarantine /Applications/AegisMail.app`
+
+Signed + notarized builds require an Apple Developer ID and are a future milestone.
+
+### Claude Desktop (MCP)
+
+See [`packages/mcp/README.md`](./packages/mcp/README.md) for the config snippet that lets Claude Desktop spawn the AegisMail MCP server.
 
 ## Contributing
 

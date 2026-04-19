@@ -1,5 +1,3 @@
-use tauri::Manager;
-
 const KEYCHAIN_SERVICE: &str = "com.aegismail.app";
 const SERVER_TOKEN_ACCOUNT: &str = "__server_bearer_token__";
 
@@ -26,10 +24,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![app_version, get_server_token])
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(debug_assertions)]
-            if let Some(window) = app.get_webview_window("main") {
-                window.open_devtools();
+            {
+                use tauri::Manager;
+                if let Some(window) = _app.get_webview_window("main") {
+                    window.open_devtools();
+                }
             }
             Ok(())
         })
