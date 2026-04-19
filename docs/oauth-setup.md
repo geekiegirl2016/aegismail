@@ -86,6 +86,26 @@ Client IDs **are not secret** for public (desktop) OAuth apps — they're identi
 
 ---
 
+## Where do the OAuth client IDs live at runtime?
+
+AegisMail looks in **three places**, in this order:
+
+1. `$AEGIS_ENV_FILE` — explicit override, mostly useful for tests / CI.
+2. `~/Library/Application Support/AegisMail/aegismail.env` — the user-writable config the packaged `.app` reads on every launch. **Use this for the installed `.app`** so you never rebuild the sidecar to rotate creds.
+3. `.env` found by walking up from the current working directory (covers `pnpm --filter @aegismail/server dev` and `pnpm --filter @aegismail/desktop tauri:dev`).
+
+First file that defines each key wins. The Rust side reads all three and forwards keys with the `AEGIS_` prefix to the bundled sidecar at spawn time. So for the installed `.app`:
+
+```sh
+mkdir -p "$HOME/Library/Application Support/AegisMail"
+cat > "$HOME/Library/Application Support/AegisMail/aegismail.env" <<'EOF'
+AEGIS_GOOGLE_OAUTH_CLIENT_ID=...apps.googleusercontent.com
+AEGIS_GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
+EOF
+```
+
+Then relaunch AegisMail.
+
 ## Verifying the client IDs
 
 Once both are in place, start the server (`pnpm --filter @aegismail/server dev`) and hit:

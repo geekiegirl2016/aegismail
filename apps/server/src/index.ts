@@ -1,10 +1,12 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { loadEnvFiles } from './env.ts';
 import { openDb } from './db/index.ts';
 import { createCredentialStore } from './keychain.ts';
 import { createTokenStore } from './oauth/token-store.ts';
 
 async function main(): Promise<void> {
+  const envFiles = loadEnvFiles();
   const config = loadConfig();
   const db = openDb();
   const credentials = createCredentialStore();
@@ -24,6 +26,7 @@ async function main(): Promise<void> {
       port: config.AEGIS_SERVER_PORT,
       tokenHint: `${bearerToken.slice(0, 6)}…`,
       googleOAuth: !!config.AEGIS_GOOGLE_OAUTH_CLIENT_ID,
+      envFiles,
     },
     'aegismail server ready',
   );
