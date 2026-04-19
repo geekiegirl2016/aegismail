@@ -9,9 +9,17 @@ async function main(): Promise<void> {
   const db = openDb();
   const credentials = createCredentialStore();
 
-  const app = await buildApp({ config, db, credentials });
+  const { app, registry, bearerToken } = await buildApp({ config, db, credentials });
 
   await app.listen({ host: config.AEGIS_SERVER_HOST, port: config.AEGIS_SERVER_PORT });
+  app.log.info(
+    {
+      host: config.AEGIS_SERVER_HOST,
+      port: config.AEGIS_SERVER_PORT,
+      tokenHint: `${bearerToken.slice(0, 6)}…`,
+    },
+    'aegismail server ready',
+  );
 
   if (process.env['AEGIS_MCP_STDIO'] === '1') {
     await startMcpServer();
@@ -20,6 +28,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutting down');
     try {
+      await registry.closeAll();
       await app.close();
       db.close();
     } finally {
