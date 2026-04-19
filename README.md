@@ -56,9 +56,12 @@ pnpm --filter @aegismail/desktop tauri:dev
 pnpm --filter @aegismail/desktop tauri:build
 ```
 
-Artifacts land in `apps/desktop/src-tauri/target/release/bundle/`:
-- `macos/AegisMail.app` — drag into `/Applications`
-- `dmg/AegisMail_*_aarch64.dmg` — share-friendly installer
+This runs `sidecar:prepare` first — compiles the server, bundles it with `@vercel/ncc`, downloads an official statically-linked Node.js binary, and stages everything under `src-tauri/resources/server/`. Tauri then produces:
+
+- `apps/desktop/src-tauri/target/release/bundle/macos/AegisMail.app` — drag into `/Applications`
+- `apps/desktop/src-tauri/target/release/bundle/dmg/AegisMail_*_aarch64.dmg` — share-friendly installer
+
+When you launch the `.app`, the Rust side spawns the bundled server as a child process and kills it on quit. **No separate terminal / `pnpm dev` required** — it really is a real Mac app.
 
 Because the build is **unsigned**, macOS Gatekeeper will refuse to open the `.app` on first launch. Workarounds:
 
