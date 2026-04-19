@@ -1,0 +1,40 @@
+{
+  "name": "@aegismail/providers",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Provider adapters for Microsoft Graph (Outlook), Gmail, and JMAP (iCloud/Fastmail).",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./graph": {
+      "types": "./dist/graph/index.d.ts",
+      "import": "./dist/graph/index.js"
+    },
+    "./gmail": {
+      "types": "./dist/gmail/index.d.ts",
+      "import": "./dist/gmail/index.js"
+    },
+    "./jmap": {
+      "types": "./dist/jmap/index.d.ts",
+      "import": "./dist/jmap/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@aegismail/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

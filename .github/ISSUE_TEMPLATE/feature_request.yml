@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a new feature or enhancement
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the user problem. Focus on the "why" before the "what".
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should AegisMail do? Rough sketches, wireframes, and API shapes are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: component
+    attributes:
+      label: Primary component
+      options:
+        - apps/desktop
+        - apps/server
+        - packages/providers
+        - packages/mcp
+        - packages/ui
+        - packages/core
+        - cross-cutting
+    validations:
+      required: true

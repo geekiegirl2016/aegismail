@@ -1,0 +1,33 @@
+{
+  "name": "@aegismail/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AegisMail backend: Fastify HTTP API and MCP server.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -b",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc -b --noEmit",
+    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@aegismail/core": "workspace:*",
+    "@aegismail/mcp": "workspace:*",
+    "@aegismail/providers": "workspace:*",
+    "@fastify/cors": "^10.0.1",
+    "@fastify/sensible": "^6.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "fastify": "^5.1.0",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

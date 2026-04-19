@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a problem with AegisMail
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill in the fields below so we can reproduce the issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the bug.
+      placeholder: "When I click X, Y happens instead of Z."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to trigger the bug.
+      placeholder: |
+        1. Open AegisMail
+        2. Go to ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - apps/desktop
+        - apps/server
+        - packages/providers (Outlook/Graph)
+        - packages/providers (Gmail)
+        - packages/providers (iCloud/JMAP)
+        - packages/mcp
+        - packages/ui
+        - packages/core
+        - unsure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AegisMail version / commit
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Please redact any personal data (email addresses, message contents) before attaching.
