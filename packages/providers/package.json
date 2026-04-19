@@ -37,7 +37,7 @@
     "@aegismail/core": "workspace:*",
     "imapflow": "^1.0.187",
     "mailparser": "^3.7.2",
-    "zod": "^3.23.8"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/mailparser": "^3.4.5",
