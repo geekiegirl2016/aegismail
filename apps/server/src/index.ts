@@ -1,16 +1,34 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { openDb } from './db/index.ts';
+import { createCredentialStore } from './keychain.ts';
 import { startMcpServer } from './mcp.ts';
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const app = await buildApp(config);
+  const db = openDb();
+  const credentials = createCredentialStore();
+
+  const app = await buildApp({ config, db, credentials });
 
   await app.listen({ host: config.AEGIS_SERVER_HOST, port: config.AEGIS_SERVER_PORT });
 
   if (process.env['AEGIS_MCP_STDIO'] === '1') {
     await startMcpServer();
   }
+
+  const shutdown = async (signal: string): Promise<void> => {
+    app.log.info({ signal }, 'shutting down');
+    try {
+      await app.close();
+      db.close();
+    } finally {
+      process.exit(0);
+    }
+  };
+
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
 main().catch((err: unknown) => {
