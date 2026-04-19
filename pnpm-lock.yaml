@@ -81,9 +81,6 @@ importers:
       '@aegismail/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@aegismail/mcp':
-        specifier: workspace:*
-        version: link:../../packages/mcp
       '@aegismail/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -143,10 +140,16 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.4
         version: 1.29.0(zod@3.25.76)
+      keytar:
+        specifier: ^7.9.0
+        version: 7.9.0
       zod:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

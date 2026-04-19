@@ -2,29 +2,40 @@
   "name": "@aegismail/mcp",
   "version": "0.0.0",
   "private": true,
-  "description": "MCP tool definitions for AegisMail.",
+  "description": "MCP tool definitions and stdio server for AegisMail.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "aegismail-mcp": "./dist/stdio.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./stdio": {
+      "types": "./dist/stdio.d.ts",
+      "import": "./dist/stdio.js"
     }
   },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
+    "start": "node dist/stdio.js",
+    "dev": "tsx watch src/stdio.ts",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
     "@aegismail/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "keytar": "^7.9.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "tsx": "^4.19.2",
     "typescript": "^5.7.0"
   }
 }

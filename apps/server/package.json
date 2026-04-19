@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@aegismail/core": "workspace:*",
-    "@aegismail/mcp": "workspace:*",
     "@aegismail/providers": "workspace:*",
     "@fastify/cors": "^10.0.1",
     "@fastify/sensible": "^6.0.1",

@@ -2,7 +2,6 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db/index.ts';
 import { createCredentialStore } from './keychain.ts';
-import { startMcpServer } from './mcp.ts';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -20,10 +19,6 @@ async function main(): Promise<void> {
     },
     'aegismail server ready',
   );
-
-  if (process.env['AEGIS_MCP_STDIO'] === '1') {
-    await startMcpServer();
-  }
 
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutting down');
