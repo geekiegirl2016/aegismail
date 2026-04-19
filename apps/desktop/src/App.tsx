@@ -1,53 +1,89 @@
-import { useState } from 'react';
-import type { Account, AccountProvider } from '@aegismail/core';
-
-const PROVIDERS: { id: AccountProvider; label: string }[] = [
-  { id: 'outlook', label: 'Outlook' },
-  { id: 'gmail', label: 'Gmail' },
-  { id: 'icloud', label: 'iCloud' },
-];
+import { useEffect, useState } from 'react';
+import { useAccounts } from './api/hooks.ts';
+import { ConnectAccountForm } from './components/ConnectAccountForm.tsx';
+import { Sidebar } from './components/Sidebar.tsx';
+import { MessageList } from './components/MessageList.tsx';
+import { MessageView } from './components/MessageView.tsx';
 
 export function App() {
-  const [accounts] = useState<Account[]>([]);
+  const { data: accounts = [], isLoading, error } = useAccounts();
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedMailboxId, setSelectedMailboxId] = useState<string | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [showConnect, setShowConnect] = useState(false);
+
+  // Auto-select the first account once loaded.
+  useEffect(() => {
+    if (!selectedAccountId && accounts[0]) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [accounts, selectedAccountId]);
+
+  // Reset selections when switching account or mailbox.
+  useEffect(() => {
+    setSelectedMailboxId(null);
+    setSelectedMessageId(null);
+  }, [selectedAccountId]);
+  useEffect(() => {
+    setSelectedMessageId(null);
+  }, [selectedMailboxId]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen grid place-items-center text-sm text-neutral-500">
+        Loading…
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen grid place-items-center p-6 text-sm">
+        <div className="max-w-md text-center">
+          <p className="text-red-600 mb-2">Could not reach the AegisMail server.</p>
+          <p className="text-neutral-500">
+            Start it with{' '}
+            <code className="px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800">
+              pnpm --filter @aegismail/server dev
+            </code>{' '}
+            and reopen AegisMail.
+          </p>
+          <p className="text-xs text-neutral-500 mt-4">
+            {error instanceof Error ? error.message : String(error)}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (accounts.length === 0 || showConnect) {
+    return (
+      <main className="min-h-screen grid place-items-center">
+        <ConnectAccountForm
+          onConnected={() => setShowConnect(false)}
+        />
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen flex flex-col">
-      <header className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800">
-        <h1 className="text-lg font-semibold tracking-tight">AegisMail</h1>
-        <p className="text-sm text-neutral-500">Unified mail for Outlook, Gmail, and iCloud.</p>
-      </header>
-
-      <section className="flex-1 p-6 grid gap-4">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Connect an account
-        </h2>
-        <div className="flex gap-2">
-          {PROVIDERS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="px-3 py-2 rounded-md border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-900 text-sm"
-            >
-              Connect {p.label}
-            </button>
-          ))}
-        </div>
-
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500 mt-4">
-          Accounts
-        </h2>
-        {accounts.length === 0 ? (
-          <p className="text-sm text-neutral-500">No accounts connected yet.</p>
-        ) : (
-          <ul className="grid gap-2">
-            {accounts.map((a) => (
-              <li key={a.id} className="text-sm">
-                {a.displayName} — {a.provider}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+    <main className="h-screen flex">
+      <Sidebar
+        accounts={accounts}
+        selectedAccountId={selectedAccountId}
+        selectedMailboxId={selectedMailboxId}
+        onSelectAccount={setSelectedAccountId}
+        onSelectMailbox={setSelectedMailboxId}
+        onAddAccount={() => setShowConnect(true)}
+      />
+      <MessageList
+        accountId={selectedAccountId}
+        mailboxId={selectedMailboxId}
+        selectedMessageId={selectedMessageId}
+        onSelect={setSelectedMessageId}
+      />
+      <MessageView accountId={selectedAccountId} messageId={selectedMessageId} />
     </main>
   );
 }
