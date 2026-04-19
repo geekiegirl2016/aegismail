@@ -7,7 +7,10 @@ import './styles.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      // Sidecar can take a second to bind on cold start; retry enough to
+      // ride that out without forcing the user to refresh.
+      retry: 6,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
       refetchOnWindowFocus: false,
       staleTime: 10_000,
     },

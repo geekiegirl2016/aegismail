@@ -31,6 +31,7 @@
     "shortDescription": "Unified mail client",
     "longDescription": "AegisMail is a unified, privacy-respecting mail client for Outlook, Gmail, and iCloud/Apple Mail.",
     "copyright": "Copyright © 2026 AegisMail contributors",
+    "resources": ["resources/server/**/*"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

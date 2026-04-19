@@ -10,11 +10,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "pnpm sidecar:prepare && tauri dev",
+    "tauri:build": "pnpm sidecar:prepare && tauri build",
+    "sidecar:prepare": "pnpm --filter @aegismail/server package && node scripts/copy-sidecar.mjs",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc -b --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo src-tauri/binaries"
   },
   "dependencies": {
     "@aegismail/core": "workspace:*",
