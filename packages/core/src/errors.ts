@@ -8,7 +8,7 @@ export type AegisErrorCode =
 
 export class AegisError extends Error {
   readonly code: AegisErrorCode;
-  readonly cause?: unknown;
+  override readonly cause?: unknown;
 
   constructor(code: AegisErrorCode, message: string, options?: { cause?: unknown }) {
     super(message);
