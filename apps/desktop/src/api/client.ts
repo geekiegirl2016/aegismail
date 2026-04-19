@@ -138,4 +138,21 @@ export const api = {
       `/v1/accounts/${encodeURIComponent(accountId)}/messages/${encodeURIComponent(messageId)}`,
       { method: 'DELETE' },
     ),
+
+  listOAuthProviders: () =>
+    request<{ providers: Array<{ id: string; configured: boolean }> }>(
+      '/v1/oauth/providers',
+    ),
+
+  startGoogleOAuth: (input: { displayName: string; loginHint?: string }) =>
+    request<{ sessionId: string; authUrl: string }>('/v1/oauth/google/start', {
+      method: 'POST',
+      body: input,
+    }),
+
+  awaitGoogleOAuth: (sessionId: string) =>
+    request<{ account: Account }>('/v1/oauth/google/await', {
+      method: 'POST',
+      body: { sessionId },
+    }),
 };

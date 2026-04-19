@@ -2,13 +2,20 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db/index.ts';
 import { createCredentialStore } from './keychain.ts';
+import { createTokenStore } from './oauth/token-store.ts';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const db = openDb();
   const credentials = createCredentialStore();
+  const tokens = createTokenStore();
 
-  const { app, registry, bearerToken } = await buildApp({ config, db, credentials });
+  const { app, registry, bearerToken } = await buildApp({
+    config,
+    db,
+    credentials,
+    tokens,
+  });
 
   await app.listen({ host: config.AEGIS_SERVER_HOST, port: config.AEGIS_SERVER_PORT });
   app.log.info(
@@ -16,6 +23,7 @@ async function main(): Promise<void> {
       host: config.AEGIS_SERVER_HOST,
       port: config.AEGIS_SERVER_PORT,
       tokenHint: `${bearerToken.slice(0, 6)}…`,
+      googleOAuth: !!config.AEGIS_GOOGLE_OAUTH_CLIENT_ID,
     },
     'aegismail server ready',
   );

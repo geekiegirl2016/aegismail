@@ -1,12 +1,20 @@
 import { ImapFlow } from 'imapflow';
 import { AegisError } from '@aegismail/core';
 
+export type ImapConnectionAuth =
+  | { kind: 'password'; password: string }
+  | {
+      kind: 'oauth2';
+      /** Called on every connect attempt; expected to refresh if stale. */
+      getAccessToken: () => Promise<string>;
+    };
+
 export interface ImapConnectionOptions {
   host: string;
   port: number;
   secure: boolean;
   username: string;
-  password: string;
+  auth: ImapConnectionAuth;
 }
 
 /**
@@ -32,15 +40,22 @@ export class ImapConnection {
     }
   }
 
+  private async resolveAuth(): Promise<{ user: string; pass?: string; accessToken?: string }> {
+    if (this.options.auth.kind === 'password') {
+      return { user: this.options.username, pass: this.options.auth.password };
+    }
+    const token = await this.options.auth.getAccessToken();
+    return { user: this.options.username, accessToken: token };
+  }
+
   private async connect(): Promise<ImapFlow> {
+    const auth = await this.resolveAuth();
+
     const client = new ImapFlow({
       host: this.options.host,
       port: this.options.port,
       secure: this.options.secure,
-      auth: {
-        user: this.options.username,
-        pass: this.options.password,
-      },
+      auth,
       logger: false,
       tls: {
         minVersion: 'TLSv1.2',
@@ -69,10 +84,6 @@ export class ImapConnection {
   }
 }
 
-/**
- * Translate IMAP/network errors into AegisError with a code the rest of
- * the stack can switch on without sniffing messages.
- */
 export function mapImapError(err: unknown, fallbackMessage: string): AegisError {
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();

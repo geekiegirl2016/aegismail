@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react';
+import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AccountProvider } from '@aegismail/core';
-import { useCreateAccount } from '../api/hooks.ts';
-import { ApiError } from '../api/client.ts';
+import { useCreateAccount, useOAuthProviders, qk } from '../api/hooks.ts';
+import { api, ApiError } from '../api/client.ts';
+import { useTheme } from '../contexts/ThemeContext.tsx';
 
 interface Props {
   onConnected?: () => void;
@@ -11,7 +14,7 @@ interface Props {
 interface ProviderOption {
   id: AccountProvider;
   label: string;
-  available: boolean;
+  kind: 'password' | 'oauth';
   note: string;
 }
 
@@ -19,64 +22,112 @@ const PROVIDERS: readonly ProviderOption[] = [
   {
     id: 'icloud',
     label: 'iCloud',
-    available: true,
+    kind: 'password',
     note: 'Use an app-specific password from appleid.apple.com.',
   },
   {
     id: 'gmail',
     label: 'Gmail',
-    available: false,
-    note: 'OAuth support is on the roadmap.',
+    kind: 'oauth',
+    note: 'Sign in with Google.',
   },
   {
     id: 'outlook',
     label: 'Outlook',
-    available: false,
-    note: 'Microsoft Graph support is on the roadmap.',
+    kind: 'oauth',
+    note: 'Microsoft Graph — coming in Phase 11.',
   },
 ];
 
 export function ConnectAccountForm({ onConnected, onCancel }: Props) {
+  const { theme } = useTheme();
+  const qc = useQueryClient();
+  const { data: oauthProviders } = useOAuthProviders();
+
+  const googleConfigured =
+    oauthProviders?.find((p) => p.id === 'google')?.configured ?? false;
+  const microsoftConfigured =
+    oauthProviders?.find((p) => p.id === 'microsoft')?.configured ?? false;
+
   const [provider, setProvider] = useState<AccountProvider>('icloud');
   const [displayName, setDisplayName] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [appPassword, setAppPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [oauthBusy, setOauthBusy] = useState(false);
 
-  const { mutateAsync, isPending } = useCreateAccount();
+  const { mutateAsync: createAccount, isPending: creating } = useCreateAccount();
 
-  const selected = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0];
+  const available = (p: ProviderOption): boolean => {
+    if (p.id === 'icloud') return true;
+    if (p.id === 'gmail') return googleConfigured;
+    if (p.id === 'outlook') return microsoftConfigured;
+    return false;
+  };
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  const selected = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0]!;
+
+  async function handleIcloudSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selected?.available) return;
     setError(null);
     try {
-      await mutateAsync({
+      await createAccount({
         provider: 'icloud',
         displayName: displayName.trim(),
         emailAddress: emailAddress.trim(),
         appPassword,
       });
-      // Clear the password from React state the instant the server has it.
       setAppPassword('');
       setDisplayName('');
       setEmailAddress('');
       onConnected?.();
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(`${err.code}: ${err.message}`);
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      handleError(err);
     }
   }
+
+  async function handleGmailSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setOauthBusy(true);
+    try {
+      const { sessionId, authUrl } = await api.startGoogleOAuth({
+        displayName: displayName.trim(),
+        ...(emailAddress.trim() ? { loginHint: emailAddress.trim() } : {}),
+      });
+      await openExternal(authUrl);
+      const { account } = await api.awaitGoogleOAuth(sessionId);
+      await qc.invalidateQueries({ queryKey: qk.accounts });
+      setDisplayName('');
+      setEmailAddress('');
+      onConnected?.();
+      void account;
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setOauthBusy(false);
+    }
+  }
+
+  function handleError(err: unknown): void {
+    if (err instanceof ApiError) {
+      setError(`${err.code}: ${err.message}`);
+    } else {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  const handleSubmit =
+    selected.kind === 'oauth' ? handleGmailSubmit : handleIcloudSubmit;
+
+  const busy = creating || oauthBusy;
 
   return (
     <form
       onSubmit={handleSubmit}
       className="grid gap-4 p-6 w-full max-w-md"
       autoComplete="off"
+      style={{ color: theme.text }}
     >
       <header className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Connect an account</h2>
@@ -84,7 +135,8 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+            className="text-sm"
+            style={{ color: theme.textDim }}
           >
             ← Back
           </button>
@@ -94,24 +146,29 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
       <div className="grid grid-cols-3 gap-2">
         {PROVIDERS.map((p) => {
           const active = p.id === provider;
+          const isAvailable = available(p);
           return (
             <button
               key={p.id}
               type="button"
-              disabled={!p.available}
+              disabled={!isAvailable}
               aria-pressed={active}
-              onClick={() => p.available && setProvider(p.id)}
-              className={`px-3 py-2 rounded-md border text-sm transition-colors ${
-                active
-                  ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900'
-                  : 'border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-900'
-              } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent`}
-              title={p.available ? p.note : `${p.label}: coming soon`}
+              onClick={() => isAvailable && setProvider(p.id)}
+              className="px-3 py-2 rounded-md border text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                borderColor: active ? theme.accent : theme.border,
+                background: active ? theme.accent : 'transparent',
+                color: active ? theme.accentContrast : theme.text,
+              }}
+              title={isAvailable ? p.note : `${p.label}: not configured yet`}
             >
               <span className="block font-medium">{p.label}</span>
-              {!p.available && (
-                <span className="block text-[10px] uppercase tracking-wide text-neutral-500">
-                  Coming soon
+              {!isAvailable && (
+                <span
+                  className="block text-[10px] uppercase tracking-wide"
+                  style={{ color: theme.textDim }}
+                >
+                  {p.id === 'outlook' ? 'Coming soon' : 'Not configured'}
                 </span>
               )}
             </button>
@@ -119,8 +176,8 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
         })}
       </div>
 
-      <p className="text-sm text-neutral-500">
-        {selected?.id === 'icloud' ? (
+      <p className="text-sm" style={{ color: theme.textDim }}>
+        {selected.id === 'icloud' ? (
           <>
             Generate an{' '}
             <a
@@ -134,56 +191,91 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
             at appleid.apple.com. It stays in your macOS Keychain; AegisMail
             never logs it.
           </>
+        ) : selected.id === 'gmail' ? (
+          googleConfigured ? (
+            'We\'ll open Google in your browser for you to sign in. Tokens land in the macOS Keychain.'
+          ) : (
+            <>
+              Google OAuth isn't configured for this install. See{' '}
+              <code>docs/oauth-setup.md</code> and set the{' '}
+              <code>AEGIS_GOOGLE_OAUTH_CLIENT_ID</code> /{' '}
+              <code>AEGIS_GOOGLE_OAUTH_CLIENT_SECRET</code> env vars.
+            </>
+          )
         ) : (
-          selected?.note
+          selected.note
         )}
       </p>
 
       <label className="grid gap-1 text-sm">
-        <span className="text-neutral-500">Display name</span>
+        <span style={{ color: theme.textDim }}>Display name</span>
         <input
-          className="px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800"
+          className="px-3 py-2 rounded-md border"
           type="text"
           required
-          disabled={!selected?.available}
+          disabled={!available(selected) || busy}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           placeholder="Personal"
+          style={{
+            background: theme.panelAlt,
+            borderColor: theme.border,
+            color: theme.text,
+          }}
         />
       </label>
 
       <label className="grid gap-1 text-sm">
-        <span className="text-neutral-500">Email address</span>
+        <span style={{ color: theme.textDim }}>
+          Email address{selected.kind === 'oauth' ? ' (optional, pre-fills consent)' : ''}
+        </span>
         <input
-          className="px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800"
+          className="px-3 py-2 rounded-md border"
           type="email"
           autoComplete="username"
-          required
-          disabled={!selected?.available}
+          required={selected.kind === 'password'}
+          disabled={!available(selected) || busy}
           value={emailAddress}
           onChange={(e) => setEmailAddress(e.target.value)}
-          placeholder="you@icloud.com"
+          placeholder={selected.id === 'gmail' ? 'you@gmail.com' : 'you@icloud.com'}
+          style={{
+            background: theme.panelAlt,
+            borderColor: theme.border,
+            color: theme.text,
+          }}
         />
       </label>
 
-      <label className="grid gap-1 text-sm">
-        <span className="text-neutral-500">App-specific password</span>
-        <input
-          className="px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 font-mono"
-          type="password"
-          autoComplete="new-password"
-          required
-          disabled={!selected?.available}
-          value={appPassword}
-          onChange={(e) => setAppPassword(e.target.value)}
-          placeholder="xxxx-xxxx-xxxx-xxxx"
-        />
-      </label>
+      {selected.kind === 'password' && (
+        <label className="grid gap-1 text-sm">
+          <span style={{ color: theme.textDim }}>App-specific password</span>
+          <input
+            className="px-3 py-2 rounded-md border font-mono"
+            type="password"
+            autoComplete="new-password"
+            required
+            disabled={busy}
+            value={appPassword}
+            onChange={(e) => setAppPassword(e.target.value)}
+            placeholder="xxxx-xxxx-xxxx-xxxx"
+            style={{
+              background: theme.panelAlt,
+              borderColor: theme.border,
+              color: theme.text,
+            }}
+          />
+        </label>
+      )}
 
       {error && (
         <div
           role="alert"
-          className="text-sm text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40 rounded-md px-3 py-2"
+          className="text-sm rounded-md px-3 py-2"
+          style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            color: '#FCA5A5',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+          }}
         >
           {error}
         </div>
@@ -191,11 +283,24 @@ export function ConnectAccountForm({ onConnected, onCancel }: Props) {
 
       <button
         type="submit"
-        disabled={isPending || !selected?.available}
-        className="px-3 py-2 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+        disabled={busy || !available(selected)}
+        className="px-3 py-2 rounded-md text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ background: theme.accent, color: theme.accentContrast }}
       >
-        {isPending ? 'Connecting…' : `Connect ${selected?.label ?? 'account'}`}
+        {busy
+          ? selected.kind === 'oauth'
+            ? 'Waiting for browser…'
+            : 'Connecting…'
+          : selected.kind === 'oauth'
+            ? `Sign in with ${selected.label}`
+            : `Connect ${selected.label}`}
       </button>
+
+      {oauthBusy && (
+        <p className="text-xs text-center" style={{ color: theme.textDim }}>
+          Complete sign-in in your browser, then come back here.
+        </p>
+      )}
     </form>
   );
 }

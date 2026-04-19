@@ -37,3 +37,15 @@ export const FASTMAIL_IMAP: Pick<ImapAccountConfig, 'host' | 'port' | 'secure'> 
   port: 993,
   secure: true,
 };
+
+export const GMAIL_IMAP: Pick<ImapAccountConfig, 'host' | 'port' | 'secure'> = {
+  host: 'imap.gmail.com',
+  port: 993,
+  secure: true,
+};
+
+export const GMAIL_SMTP = {
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+} as const;

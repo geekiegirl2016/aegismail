@@ -41,12 +41,13 @@ Client IDs **are not secret** for public (desktop) OAuth apps — they're identi
    - Name: `AegisMail Desktop`.
    - Click *Create*. Copy the **Client ID**. *(Ignore the "client secret" — Google issues one but PKCE public clients don't use it. We'll treat it as unused.)*
 
-6. **Drop the client ID into the repo**:
-   - Add to `.env` (which is git-ignored):
-     ```
-     AEGIS_GOOGLE_OAUTH_CLIENT_ID=1234567890-abc...apps.googleusercontent.com
-     ```
-   - Or, if you want it shipped to all AegisMail users (Option A from our plan), commit it to `apps/server/src/oauth/google.ts` as a constant.
+6. **Drop the client ID + secret into `.env`**:
+   ```
+   AEGIS_GOOGLE_OAUTH_CLIENT_ID=1234567890-abc...apps.googleusercontent.com
+   AEGIS_GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
+   ```
+
+   Google issues a "client secret" for desktop apps even though RFC 8252 public clients can't keep secrets. Per Google's [documented position](https://developers.google.com/identity/protocols/oauth2/native-app) it's fine to embed in native apps — PKCE is what actually secures the flow. If you want Option A (ship to all AegisMail users), commit the pair to a non-git-ignored config file and your CI will bake them in.
 
 7. **Redirect URI** is automatic for desktop apps — Google accepts any `http://127.0.0.1:*` loopback URI. AegisMail picks a free port at flow-start and tells Google on the fly.
 

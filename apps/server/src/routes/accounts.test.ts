@@ -3,11 +3,13 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.ts';
 import { openDb, type Db } from '../db/index.ts';
 import { InMemoryCredentialStore } from '../keychain.ts';
+import { InMemoryTokenStore } from '../oauth/token-store.ts';
 
 describe('accounts routes', () => {
   let app: FastifyInstance;
   let db: Db;
   let credentials: InMemoryCredentialStore;
+  let tokens: InMemoryTokenStore;
   let token: string;
 
   const authHeader = (): { authorization: string } => ({
@@ -17,6 +19,7 @@ describe('accounts routes', () => {
   beforeEach(async () => {
     db = openDb({ path: ':memory:' });
     credentials = new InMemoryCredentialStore();
+    tokens = new InMemoryTokenStore();
     const built = await buildApp({
       config: {
         AEGIS_SERVER_HOST: '127.0.0.1',
@@ -25,6 +28,7 @@ describe('accounts routes', () => {
       },
       db,
       credentials,
+      tokens,
     });
     app = built.app;
     token = built.bearerToken;

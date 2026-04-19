@@ -8,7 +8,7 @@ import type {
   Message,
 } from '@aegismail/core';
 import type { ListMessagesOptions, ListMessagesResult, MailProvider } from '../provider.ts';
-import { ImapConnection, mapImapError } from './connection.ts';
+import { ImapConnection, type ImapConnectionAuth, mapImapError } from './connection.ts';
 import {
   makeMailboxId,
   makeMessageId,
@@ -18,25 +18,40 @@ import {
 import { inferRole } from './mailbox-role.ts';
 import type { ImapAccountConfig, ImapCredentials } from './types.ts';
 
+export interface ImapOAuthCredentials {
+  username: string;
+  getAccessToken: () => Promise<string>;
+}
+
 export interface ImapProviderOptions {
   accountId: string;
+  /** Which AccountProvider label this instance reports as. Defaults to 'icloud'. */
+  providerId?: 'icloud' | 'gmail';
   config: ImapAccountConfig;
-  credentials: ImapCredentials;
+  /** Static password or an OAuth2 access-token supplier. */
+  credentials: ImapCredentials | ImapOAuthCredentials;
 }
 
 export class ImapProvider implements MailProvider {
-  readonly id = 'icloud' as const;
+  readonly id: 'icloud' | 'gmail';
   readonly accountId: string;
   private readonly connection: ImapConnection;
 
   constructor(options: ImapProviderOptions) {
     this.accountId = options.accountId;
+    this.id = options.providerId ?? 'icloud';
+
+    const auth: ImapConnectionAuth =
+      'password' in options.credentials
+        ? { kind: 'password', password: options.credentials.password }
+        : { kind: 'oauth2', getAccessToken: options.credentials.getAccessToken };
+
     this.connection = new ImapConnection({
       host: options.config.host,
       port: options.config.port,
       secure: options.config.secure,
       username: options.credentials.username,
-      password: options.credentials.password,
+      auth,
     });
   }
 

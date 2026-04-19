@@ -9,12 +9,21 @@ import { api } from './client.ts';
 
 export const qk = {
   accounts: ['accounts'] as const,
+  oauthProviders: ['oauth', 'providers'] as const,
   mailboxes: (accountId: string) => ['mailboxes', accountId] as const,
   messages: (accountId: string, mailboxId: string) =>
     ['messages', accountId, mailboxId] as const,
   message: (accountId: string, messageId: string) =>
     ['message', accountId, messageId] as const,
 };
+
+export function useOAuthProviders() {
+  return useQuery({
+    queryKey: qk.oauthProviders,
+    queryFn: async () => (await api.listOAuthProviders()).providers,
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useAccounts(): UseQueryResult<Account[]> {
   return useQuery({
