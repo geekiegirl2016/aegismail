@@ -1,37 +1,40 @@
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{Manager, RunEvent, State};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use rand::RngCore;
+use tauri::{Manager, RunEvent};
 
-const KEYCHAIN_SERVICE: &str = "com.aegismail.app";
-const SERVER_TOKEN_ACCOUNT: &str = "__server_bearer_token__";
-
-/// Holds the spawned server child so we can terminate it on app exit.
 struct SidecarState(Mutex<Option<Child>>);
+
+/// Random per-launch bearer token. Desktop shell mints it, hands it to
+/// the sidecar via the AEGIS_SERVER_TOKEN env var, and returns the same
+/// value to the frontend via `get_server_token`.
+///
+/// Keeping the token in-process (not Keychain) avoids the
+/// "X wants to access your Keychain" authorization prompt the OS would
+/// otherwise raise every time the unsigned app bundle spawns its
+/// sidecar. Per-account iCloud passwords still live in the Keychain —
+/// those prompts are expected and user-initiated.
+struct ServerToken(String);
 
 #[tauri::command]
 fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Reads the AegisMail server bearer token from the macOS Keychain.
-///
-/// The token is minted and stored by the bundled server on first boot
-/// under service="com.aegismail.app", account="__server_bearer_token__".
-/// The OS keyring is the bridge between the sidecar process and the
-/// frontend — no secrets cross the IPC boundary in plaintext.
 #[tauri::command]
-fn get_server_token() -> Result<String, String> {
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, SERVER_TOKEN_ACCOUNT)
-        .map_err(|e| format!("keychain entry: {e}"))?;
-    entry.get_password().map_err(|e| format!("keychain read: {e}"))
+fn get_server_token(state: tauri::State<'_, ServerToken>) -> String {
+    state.0.clone()
+}
+
+fn mint_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
 }
 
 /// Spawn the bundled AegisMail server using its own Node runtime.
-///
-/// The packaged server lives at `<resource_dir>/resources/server/` and
-/// is spawned as a plain child process (no Tauri shell plugin — less
-/// surface area and no capability allowlist gymnastics).
-fn spawn_server(app: &tauri::AppHandle) -> Result<Child, String> {
+fn spawn_server(app: &tauri::AppHandle, token: &str) -> Result<Child, String> {
     let resource_dir = app
         .path()
         .resource_dir()
@@ -52,6 +55,7 @@ fn spawn_server(app: &tauri::AppHandle) -> Result<Child, String> {
         .current_dir(&server_dir)
         .env("NODE_ENV", "production")
         .env("AEGIS_LOG_LEVEL", "info")
+        .env("AEGIS_SERVER_TOKEN", token)
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
@@ -62,12 +66,15 @@ fn spawn_server(app: &tauri::AppHandle) -> Result<Child, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let token = mint_token();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .manage(ServerToken(token.clone()))
         .invoke_handler(tauri::generate_handler![app_version, get_server_token])
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle().clone();
-            let state = match spawn_server(&handle) {
+            let state = match spawn_server(&handle, &token) {
                 Ok(child) => SidecarState(Mutex::new(Some(child))),
                 Err(err) => {
                     eprintln!("[aegismail] could not start bundled server: {err}");
@@ -86,12 +93,11 @@ pub fn run() {
         .expect("error while building AegisMail")
         .run(|app_handle, event| {
             if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
-                let state: State<SidecarState> = app_handle.state();
-                if let Ok(mut guard) = state.0.lock() {
-                    if let Some(mut child) = guard.take() {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
+                let state = app_handle.state::<SidecarState>();
+                let maybe_child = state.0.lock().ok().and_then(|mut guard| guard.take());
+                if let Some(mut child) = maybe_child {
+                    let _ = child.kill();
+                    let _ = child.wait();
                 }
             }
         });

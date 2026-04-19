@@ -10,8 +10,7 @@ function loadToken(): Promise<string> {
   tokenPromise = invoke<string>('get_server_token').catch((err: unknown) => {
     tokenPromise = null;
     throw new Error(
-      `Could not read the AegisMail bearer token from the Keychain. ` +
-        `Is the server running? (${String(err)})`,
+      `Could not obtain the AegisMail bearer token from the desktop shell. (${String(err)})`,
     );
   });
   return tokenPromise;

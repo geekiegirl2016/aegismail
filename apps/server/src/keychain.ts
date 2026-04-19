@@ -86,9 +86,46 @@ export class InMemoryCredentialStore implements CredentialStore {
   }
 }
 
+/**
+ * Credential store that accepts the server bearer token via environment
+ * variable (so the desktop shell can mint and supply it at spawn time,
+ * avoiding a cross-process Keychain authorization prompt), while still
+ * delegating per-account passwords to the macOS Keychain where a user-
+ * visible prompt is expected and appropriate.
+ */
+export class EnvTokenCredentialStore implements CredentialStore {
+  private readonly inner: CredentialStore;
+  private readonly envToken: string;
+
+  constructor(envToken: string, inner: CredentialStore) {
+    this.envToken = envToken;
+    this.inner = inner;
+  }
+
+  getPassword(accountId: string): Promise<string | null> {
+    return this.inner.getPassword(accountId);
+  }
+  setPassword(accountId: string, password: string): Promise<void> {
+    return this.inner.setPassword(accountId, password);
+  }
+  deletePassword(accountId: string): Promise<boolean> {
+    return this.inner.deletePassword(accountId);
+  }
+  async getOrCreateServerToken(): Promise<string> {
+    return this.envToken;
+  }
+  async rotateServerToken(): Promise<string> {
+    return this.envToken;
+  }
+}
+
 export function createCredentialStore(): CredentialStore {
   if (process.env['AEGIS_INSECURE_MEMORY_KEYSTORE'] === '1') {
     return new InMemoryCredentialStore();
+  }
+  const envToken = process.env['AEGIS_SERVER_TOKEN'];
+  if (envToken && envToken.length >= 16) {
+    return new EnvTokenCredentialStore(envToken, new KeychainCredentialStore());
   }
   return new KeychainCredentialStore();
 }
